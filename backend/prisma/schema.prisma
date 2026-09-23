@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String
+  phone         String?
+  role          String   // "customer" or "worker"
+  createdAt     DateTime @default(now())
+
+  workerProfile WorkerProfile?
+  bookings      Booking[] @relation("CustomerBookings")
+  reviews       Review[]
+}
+
+model WorkerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  bio         String?
+  location    String?
+  experience  Int?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  skills      WorkerSkill[]
+  bookings    Booking[] @relation("WorkerBookings")
+}
+
+model Skill {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  workers   WorkerSkill[]
+}
+
+model WorkerSkill {
+  id          String   @id @default(uuid())
+  workerId    String
+  skillId     String
+
+  worker      WorkerProfile @relation(fields: [workerId], references: [id])
+  skill       Skill         @relation(fields: [skillId], references: [id])
+
+  @@unique([workerId, skillId])
+}
+
+model Booking {
+  id           String   @id @default(uuid())
+  customerId   String
+  workerId     String
+  status       String   // pending, ongoing, completed
+  paymentMode  String?
+  paymentPaid  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  customer     User     @relation("CustomerBookings", fields: [customerId], references: [id])
+  worker       WorkerProfile @relation("WorkerBookings", fields: [workerId], references: [id])
+  review       Review?
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int
+  comment   String?
+  bookingId String   @unique
+  userId    String
+
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
