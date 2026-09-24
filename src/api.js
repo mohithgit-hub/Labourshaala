@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = "https://labourshaala-backend.onrender.com/api";
 
 export async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem("labourshaala_token");
