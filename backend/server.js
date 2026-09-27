@@ -29,13 +29,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// ----------------------------------------------------
-// Health Check
-// ----------------------------------------------------
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
@@ -44,62 +40,73 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ----------------------------------------------------
-// Authentication Routes
-// ----------------------------------------------------
-
-/**
- * Register a new user
- * Supports: Worker only, Customer only, or Both
- */
 app.post("/api/auth/register", (req, res) => {
   try {
-    const { name, email, phone, password, roleType, workerData, customerData } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      password,
+      roleType,
+      workerData,
+      customerData,
+    } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Full name is required" });
     }
+
     if (!email || !email.trim()) {
       return res.status(400).json({ error: "Email address is required" });
     }
+
     if (!password || password.length < 4) {
-      return res.status(400).json({ error: "Password must be at least 4 characters" });
+      return res.status(400).json({
+        error: "Password must be at least 4 characters",
+      });
     }
 
-    // Check if email is already registered
     const existingUser = getUserByEmail(email.trim());
+
     if (existingUser) {
-      return res.status(400).json({ error: "An account with this email already exists" });
+      return res.status(400).json({
+        error: "An account with this email already exists",
+      });
     }
 
     if (phone) {
       const existingPhone = getUserByPhone(phone.trim());
+
       if (existingPhone) {
-        return res.status(400).json({ error: "An account with this phone number already exists" });
+        return res.status(400).json({
+          error: "An account with this phone number already exists",
+        });
       }
     }
 
-    // Determine roles based on provided sections
     const hasWorker = Boolean(
       roleType === "worker" ||
-      roleType === "both" ||
-      (workerData && (workerData.skills?.length > 0 || workerData.skill))
+        roleType === "both" ||
+        (workerData &&
+          (workerData.skills?.length > 0 || workerData.skill))
     );
 
     const hasCustomer = Boolean(
       roleType === "customer" ||
-      roleType === "both" ||
-      customerData?.address ||
-      !hasWorker // Default to customer if nothing else
+        roleType === "both" ||
+        customerData?.address ||
+        !hasWorker
     );
 
     if (!hasWorker && !hasCustomer) {
       return res.status(400).json({
-        error: "Please complete either Worker details or Customer details (or both)",
+        error:
+          "Please complete either Worker details or Customer details (or both)",
       });
     }
 
     let roles = "customer";
+
     if (hasWorker && hasCustomer) {
       roles = "worker,customer";
     } else if (hasWorker) {
@@ -110,15 +117,13 @@ app.post("/api/auth/register", (req, res) => {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone ? phone.trim() : null,
-      password: password,
+      password,
       roles,
       workerData: hasWorker ? workerData : null,
       customerData: hasCustomer ? customerData : null,
     });
 
     const token = generateToken(created);
-
-    // Don't return password in response
     const { password: _, ...safeUser } = created;
 
     res.status(201).json({
@@ -128,34 +133,42 @@ app.post("/api/auth/register", (req, res) => {
     });
   } catch (err) {
     console.error("Registration error:", err);
-    res.status(500).json({ error: err.message || "Failed to register user" });
+    res.status(500).json({
+      error: err.message || "Failed to register user",
+    });
   }
 });
 
-/**
- * Login user via email or phone
- */
 app.post("/api/auth/login", (req, res) => {
   try {
     const { emailOrPhone, password } = req.body;
 
     if (!emailOrPhone || !password) {
-      return res.status(400).json({ error: "Email/Phone and password are required" });
+      return res.status(400).json({
+        error: "Email/Phone and password are required",
+      });
     }
 
     const trimmedIdentifier = emailOrPhone.trim();
+
     let user = getUserByEmail(trimmedIdentifier);
+
     if (!user) {
       user = getUserByPhone(trimmedIdentifier);
     }
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid email/phone or password" });
+      return res.status(401).json({
+        error: "Invalid email/phone or password",
+      });
     }
 
     const isValid = verifyPassword(password, user.password);
+
     if (!isValid) {
-      return res.status(401).json({ error: "Invalid email/phone or password" });
+      return res.status(401).json({
+        error: "Invalid email/phone or password",
+      });
     }
 
     const token = generateToken(user);
@@ -172,32 +185,33 @@ app.post("/api/auth/login", (req, res) => {
   }
 });
 
-/**
- * Get current authenticated user profile
- */
 app.get("/api/auth/me", requireAuth, (req, res) => {
   try {
     const user = getUserById(req.user.id);
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
     const { password: _, ...safeUser } = user;
+
     res.json({ user: safeUser });
   } catch (err) {
     console.error("Me error:", err);
-    res.status(500).json({ error: "Failed to fetch user profile" });
+    res.status(500).json({
+      error: "Failed to fetch user profile",
+    });
   }
 });
 
-/**
- * Add or update Worker Profile for current user
- */
 app.post("/api/auth/become-worker", requireAuth, (req, res) => {
   try {
     const { skills, wage, experience, location, bio } = req.body;
+
     if (!skills || !skills.length) {
-      return res.status(400).json({ error: "Please select at least one skill" });
+      return res.status(400).json({
+        error: "Please select at least one skill",
+      });
     }
 
     const updated = addOrUpdateWorkerProfile(req.user.id, {
@@ -218,17 +232,12 @@ app.post("/api/auth/become-worker", requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error("Become worker error:", err);
-    res.status(500).json({ error: err.message || "Failed to update worker profile" });
+    res.status(500).json({
+      error: err.message || "Failed to update worker profile",
+    });
   }
 });
 
-// ----------------------------------------------------
-// Worker Directory Routes
-// ----------------------------------------------------
-
-/**
- * Get list of workers (filter by skill or search term)
- */
 app.get("/api/workers", optionalAuth, (req, res) => {
   try {
     const { skill, search } = req.query;
@@ -236,42 +245,48 @@ app.get("/api/workers", optionalAuth, (req, res) => {
     res.json(workers);
   } catch (err) {
     console.error("Get workers error:", err);
-    res.status(500).json({ error: "Failed to fetch workers" });
+    res.status(500).json({
+      error: "Failed to fetch workers",
+    });
   }
 });
 
-/**
- * Get single worker details by ID
- */
 app.get("/api/workers/:id", (req, res) => {
   try {
     const worker = getWorkerById(req.params.id);
+
     if (!worker) {
-      return res.status(404).json({ error: "Worker not found" });
+      return res.status(404).json({
+        error: "Worker not found",
+      });
     }
+
     res.json(worker);
   } catch (err) {
     console.error("Get worker details error:", err);
-    res.status(500).json({ error: "Failed to fetch worker details" });
+    res.status(500).json({
+      error: "Failed to fetch worker details",
+    });
   }
 });
 
-// ----------------------------------------------------
-// Booking Routes
-// ----------------------------------------------------
-
-/**
- * Create a new booking
- */
 app.post("/api/bookings", requireAuth, (req, res) => {
   try {
     const { workerId, skillName } = req.body;
+
     if (!workerId) {
-      return res.status(400).json({ error: "workerId is required" });
+      return res.status(400).json({
+        error: "workerId is required",
+      });
     }
 
     const customerId = req.user.id;
-    const booking = createBooking({ customerId, workerId, skillName });
+
+    const booking = createBooking({
+      customerId,
+      workerId,
+      skillName,
+    });
 
     res.status(201).json({
       message: "Booking request placed successfully",
@@ -279,29 +294,28 @@ app.post("/api/bookings", requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error("Create booking error:", err);
-    res.status(500).json({ error: err.message || "Failed to create booking" });
+    res.status(500).json({
+      error: err.message || "Failed to create booking",
+    });
   }
 });
 
-/**
- * Get current customer's bookings
- */
 app.get("/api/bookings/customer", requireAuth, (req, res) => {
   try {
     const bookings = getCustomerBookings(req.user.id);
     res.json(bookings);
   } catch (err) {
     console.error("Get customer bookings error:", err);
-    res.status(500).json({ error: "Failed to fetch customer bookings" });
+    res.status(500).json({
+      error: "Failed to fetch customer bookings",
+    });
   }
 });
 
-/**
- * Get current worker's bookings
- */
 app.get("/api/bookings/worker", requireAuth, (req, res) => {
   try {
     const user = getUserById(req.user.id);
+
     if (!user || !user.workerProfile) {
       return res.json([]);
     }
@@ -310,26 +324,92 @@ app.get("/api/bookings/worker", requireAuth, (req, res) => {
     res.json(bookings);
   } catch (err) {
     console.error("Get worker bookings error:", err);
-    res.status(500).json({ error: "Failed to fetch worker bookings" });
+    res.status(500).json({
+      error: "Failed to fetch worker bookings",
+    });
   }
 });
 
-/**
- * Update booking status (e.g., Accept, Decline, Work Finished)
- */
 app.patch("/api/bookings/:id/status", requireAuth, (req, res) => {
   try {
     const { status } = req.body;
     const { id } = req.params;
 
-    const validStatuses = ["Pending", "Ongoing", "Payment Pending", "Completed", "Declined"];
+    const validStatuses = [
+      "Pending",
+      "Ongoing",
+      "Payment Pending",
+      "Completed",
+      "Declined",
+    ];
+
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    const booking = getBookingById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found",
+      });
+    }
+
+    const isCustomer = booking.customerId === req.user.id;
+    const isWorker = booking.workerUserId === req.user.id;
+
+    if (!isCustomer && !isWorker) {
+      return res.status(403).json({
+        error: "You are not authorized to modify this booking",
+      });
+    }
+
+    if (isWorker) {
+      if (booking.status !== "Pending") {
+        return res.status(400).json({
+          error:
+            "Worker can only accept or decline a booking while it is Pending",
+        });
+      }
+
+      if (status !== "Ongoing" && status !== "Declined") {
+        return res.status(403).json({
+          error: "Worker can only accept or decline a Pending booking",
+        });
+      }
+    }
+
+    if (isCustomer) {
+      if (status !== "Payment Pending") {
+        return res.status(403).json({
+          error:
+            "Customer can only mark an Ongoing booking as Payment Pending",
+        });
+      }
+
+      if (booking.status !== "Ongoing") {
+        return res.status(400).json({
+          error:
+            "Work can only be marked finished after the worker accepts the booking",
+        });
+      }
+    }
+
+    if (status === "Completed") {
+      return res.status(403).json({
+        error:
+          "A booking can only become Completed through the payment process",
+      });
     }
 
     const updated = updateBookingStatus(id, status);
+
     if (!updated) {
-      return res.status(404).json({ error: "Booking not found" });
+      return res.status(404).json({
+        error: "Booking not found",
+      });
     }
 
     res.json({
@@ -338,22 +418,54 @@ app.patch("/api/bookings/:id/status", requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error("Update booking status error:", err);
-    res.status(500).json({ error: err.message || "Failed to update booking status" });
+    res.status(500).json({
+      error: err.message || "Failed to update booking status",
+    });
   }
 });
 
-/**
- * Process booking payment
- */
 app.post("/api/bookings/:id/pay", requireAuth, (req, res) => {
   try {
-    const { paymentMethod } = req.body; // "UPI" or "Cash"
+    const { paymentMethod } = req.body;
     const { id } = req.params;
 
+    const booking = getBookingById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found",
+      });
+    }
+
+    const isCustomer = booking.customerId === req.user.id;
+
+    if (!isCustomer) {
+      return res.status(403).json({
+        error: "Only the customer who created this booking can pay",
+      });
+    }
+
+    if (booking.status !== "Payment Pending") {
+      return res.status(400).json({
+        error:
+          "Payment can only be made after the customer marks the work as finished",
+      });
+    }
+
     const method = paymentMethod || "UPI";
+
+    if (method !== "UPI" && method !== "Cash") {
+      return res.status(400).json({
+        error: "Payment method must be UPI or Cash",
+      });
+    }
+
     const updated = makeBookingPayment(id, method);
+
     if (!updated) {
-      return res.status(404).json({ error: "Booking not found" });
+      return res.status(404).json({
+        error: "Booking not found",
+      });
     }
 
     res.json({
@@ -362,37 +474,77 @@ app.post("/api/bookings/:id/pay", requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error("Booking payment error:", err);
-    res.status(500).json({ error: err.message || "Failed to process payment" });
+    res.status(500).json({
+      error: err.message || "Failed to process payment",
+    });
   }
 });
 
-/**
- * Add a rating and review to a completed booking
- */
 app.post("/api/bookings/:id/review", requireAuth, (req, res) => {
   try {
     const { rating, review } = req.body;
     const { id } = req.params;
 
-    if (!rating || Number(rating) < 1 || Number(rating) > 5) {
-      return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    if (
+      !rating ||
+      Number(rating) < 1 ||
+      Number(rating) > 5
+    ) {
+      return res.status(400).json({
+        error: "Rating must be between 1 and 5",
+      });
     }
 
-    const updated = addBookingReview(id, Number(rating), review || "");
+    const booking = getBookingById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found",
+      });
+    }
+
+    const isCustomer = booking.customerId === req.user.id;
+
+    if (!isCustomer) {
+      return res.status(403).json({
+        error:
+          "Only the customer who created this booking can review it",
+      });
+    }
+
+    if (booking.status !== "Completed") {
+      return res.status(400).json({
+        error: "You can only review a completed booking",
+      });
+    }
+
+    const updated = addBookingReview(
+      id,
+      Number(rating),
+      review || ""
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        error: "Booking not found",
+      });
+    }
+
     res.json({
       message: "Review submitted successfully",
       booking: updated,
     });
   } catch (err) {
     console.error("Booking review error:", err);
-    res.status(500).json({ error: err.message || "Failed to submit review" });
+    res.status(500).json({
+      error: err.message || "Failed to submit review",
+    });
   }
 });
 
-// Start Server
 app.listen(PORT, () => {
-  console.log(`===========================================`);
+  console.log("===========================================");
   console.log(` LabourShaala Server running on port ${PORT}`);
   console.log(` API URL: http://localhost:${PORT}/api`);
-  console.log(`===========================================`);
+  console.log("===========================================");
 });
