@@ -314,6 +314,20 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
 
     const customerId = req.user.id;
 
+    const worker = await getWorkerById(workerId);
+
+    if (!worker) {
+      return res.status(404).json({
+        error: "Worker not found",
+      });
+    }
+
+    if (worker.userId === customerId) {
+      return res.status(403).json({
+        error: "You cannot book yourself",
+      });
+    }
+
     const booking = await createBooking({
       customerId,
       workerId,
