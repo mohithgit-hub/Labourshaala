@@ -11,12 +11,12 @@ export function BookingProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch customer bookings
   const fetchCustomerBookings = useCallback(async () => {
     if (!token) {
       setCustomerBookings([]);
       return;
     }
+
     try {
       const data = await bookingsAPI.getCustomerBookings();
       setCustomerBookings(data || []);
@@ -25,12 +25,12 @@ export function BookingProvider({ children }) {
     }
   }, [token]);
 
-  // Fetch worker bookings
   const fetchWorkerBookings = useCallback(async () => {
     if (!token || !isWorker) {
       setWorkerBookings([]);
       return;
     }
+
     try {
       const data = await bookingsAPI.getWorkerBookings();
       setWorkerBookings(data || []);
@@ -39,11 +39,12 @@ export function BookingProvider({ children }) {
     }
   }, [token, isWorker]);
 
-  // Refresh all bookings for current session
   const refreshAll = useCallback(async () => {
     if (!token) return;
+
     setIsLoading(true);
     setError(null);
+
     try {
       await Promise.all([
         fetchCustomerBookings(),
@@ -54,9 +55,13 @@ export function BookingProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  }, [token, isWorker, fetchCustomerBookings, fetchWorkerBookings]);
+  }, [
+    token,
+    isWorker,
+    fetchCustomerBookings,
+    fetchWorkerBookings,
+  ]);
 
-  // Auto-fetch on user login or token change
   useEffect(() => {
     if (token && currentUser) {
       refreshAll();
@@ -66,14 +71,20 @@ export function BookingProvider({ children }) {
     }
   }, [token, currentUser, refreshAll]);
 
-  // CUSTOMER books a worker
   async function bookWorker(worker, skillName) {
     if (!currentUser) {
       throw new Error("You must be logged in to book a worker");
     }
 
-    const workerId = worker.id || worker.profileId || worker.userId;
-    const selectedSkill = skillName || worker.skill || (worker.skills && worker.skills[0]);
+    const workerId =
+      worker.id ||
+      worker.profileId ||
+      worker.userId;
+
+    const selectedSkill =
+      skillName ||
+      worker.skill ||
+      (worker.skills && worker.skills[0]);
 
     try {
       const result = await bookingsAPI.createBooking({
@@ -81,10 +92,13 @@ export function BookingProvider({ children }) {
         skillName: selectedSkill,
       });
 
-      // Update local state immediately
       if (result && result.booking) {
-        setCustomerBookings(prev => [result.booking, ...prev]);
+        setCustomerBookings(prev => [
+          result.booking,
+          ...prev,
+        ]);
       }
+
       return result.booking;
     } catch (err) {
       console.error("Book worker error:", err.message);
@@ -92,16 +106,29 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // WORKER accepts a specific booking
   async function acceptBooking(bookingId) {
     try {
-      const result = await bookingsAPI.updateStatus(bookingId, "Ongoing");
+      const result = await bookingsAPI.updateStatus(
+        bookingId,
+        "Ongoing"
+      );
+
       setWorkerBookings(prev =>
-        prev.map(b => (b.id === bookingId ? { ...b, status: "Ongoing" } : b))
+        prev.map(b =>
+          b.id === bookingId
+            ? { ...b, status: "Ongoing" }
+            : b
+        )
       );
+
       setCustomerBookings(prev =>
-        prev.map(b => (b.id === bookingId ? { ...b, status: "Ongoing" } : b))
+        prev.map(b =>
+          b.id === bookingId
+            ? { ...b, status: "Ongoing" }
+            : b
+        )
       );
+
       return result.booking;
     } catch (err) {
       console.error("Accept booking error:", err.message);
@@ -109,14 +136,25 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // WORKER declines a booking
   async function declineBooking(bookingId) {
     try {
-      const result = await bookingsAPI.updateStatus(bookingId, "Declined");
-      setWorkerBookings(prev => prev.filter(b => b.id !== bookingId));
-      setCustomerBookings(prev =>
-        prev.map(b => (b.id === bookingId ? { ...b, status: "Declined" } : b))
+      const result = await bookingsAPI.updateStatus(
+        bookingId,
+        "Declined"
       );
+
+      setWorkerBookings(prev =>
+        prev.filter(b => b.id !== bookingId)
+      );
+
+      setCustomerBookings(prev =>
+        prev.map(b =>
+          b.id === bookingId
+            ? { ...b, status: "Declined" }
+            : b
+        )
+      );
+
       return result.booking;
     } catch (err) {
       console.error("Decline booking error:", err.message);
@@ -124,16 +162,56 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // CUSTOMER finishes work (moves to Payment Pending)
+  async function cancelBooking(bookingId) {
+    try {
+      const result = await bookingsAPI.cancelBooking(
+        bookingId
+      );
+
+      setCustomerBookings(prev =>
+        prev.map(b =>
+          b.id === bookingId
+            ? { ...b, status: "Cancelled" }
+            : b
+        )
+      );
+
+      return result.booking;
+    } catch (err) {
+      console.error("Cancel booking error:", err.message);
+      throw err;
+    }
+  }
+
   async function finishBooking(bookingId) {
     try {
-      const result = await bookingsAPI.updateStatus(bookingId, "Payment Pending");
+      const result = await bookingsAPI.updateStatus(
+        bookingId,
+        "Payment Pending"
+      );
+
       setCustomerBookings(prev =>
-        prev.map(b => (b.id === bookingId ? { ...b, status: "Payment Pending" } : b))
+        prev.map(b =>
+          b.id === bookingId
+            ? {
+                ...b,
+                status: "Payment Pending",
+              }
+            : b
+        )
       );
+
       setWorkerBookings(prev =>
-        prev.map(b => (b.id === bookingId ? { ...b, status: "Payment Pending" } : b))
+        prev.map(b =>
+          b.id === bookingId
+            ? {
+                ...b,
+                status: "Payment Pending",
+              }
+            : b
+        )
       );
+
       return result.booking;
     } catch (err) {
       console.error("Finish booking error:", err.message);
@@ -141,10 +219,16 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // CUSTOMER makes payment
-  async function makePayment(bookingId, method = "UPI") {
+  async function makePayment(
+    bookingId,
+    method = "UPI"
+  ) {
     try {
-      const result = await bookingsAPI.payBooking(bookingId, method);
+      const result = await bookingsAPI.payBooking(
+        bookingId,
+        method
+      );
+
       setCustomerBookings(prev =>
         prev.map(b =>
           b.id === bookingId
@@ -157,6 +241,7 @@ export function BookingProvider({ children }) {
             : b
         )
       );
+
       setWorkerBookings(prev =>
         prev.map(b =>
           b.id === bookingId
@@ -169,6 +254,7 @@ export function BookingProvider({ children }) {
             : b
         )
       );
+
       return result.booking;
     } catch (err) {
       console.error("Make payment error:", err.message);
@@ -176,24 +262,42 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // CUSTOMER adds rating & review
-  async function addReview(bookingId, rating, review) {
+  async function addReview(
+    bookingId,
+    rating,
+    review
+  ) {
     try {
-      const result = await bookingsAPI.submitReview(bookingId, rating, review);
+      const result = await bookingsAPI.submitReview(
+        bookingId,
+        rating,
+        review
+      );
+
       setCustomerBookings(prev =>
         prev.map(b =>
           b.id === bookingId
-            ? { ...b, rating: Number(rating), review }
+            ? {
+                ...b,
+                rating: Number(rating),
+                review,
+              }
             : b
         )
       );
+
       setWorkerBookings(prev =>
         prev.map(b =>
           b.id === bookingId
-            ? { ...b, rating: Number(rating), review }
+            ? {
+                ...b,
+                rating: Number(rating),
+                review,
+              }
             : b
         )
       );
+
       return result.booking;
     } catch (err) {
       console.error("Add review error:", err.message);
@@ -201,7 +305,6 @@ export function BookingProvider({ children }) {
     }
   }
 
-  // Unified list for backward compatibility with existing components
   const bookings = [...customerBookings];
 
   return (
@@ -218,6 +321,7 @@ export function BookingProvider({ children }) {
         bookWorker,
         acceptBooking,
         declineBooking,
+        cancelBooking,
         finishBooking,
         makePayment,
         addReview,
@@ -230,8 +334,12 @@ export function BookingProvider({ children }) {
 
 export function useBooking() {
   const ctx = useContext(BookingContext);
+
   if (!ctx) {
-    throw new Error("useBooking must be used inside BookingProvider");
+    throw new Error(
+      "useBooking must be used inside BookingProvider"
+    );
   }
+
   return ctx;
 }
