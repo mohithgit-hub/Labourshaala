@@ -383,6 +383,68 @@ app.get("/api/bookings/worker", requireAuth, async (req, res) => {
   }
 });
 
+app.post(
+  "/api/bookings/:id/cancel",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const booking = await getBookingById(id);
+
+      if (!booking) {
+        return res.status(404).json({
+          error: "Booking not found",
+        });
+      }
+
+      const isCustomer =
+        booking.customerId === req.user.id;
+
+      if (!isCustomer) {
+        return res.status(403).json({
+          error:
+            "Only the customer who created this booking can cancel it",
+        });
+      }
+
+      if (booking.status !== "Pending") {
+        return res.status(400).json({
+          error:
+            "Only Pending bookings can be cancelled",
+        });
+      }
+
+      const updated = await updateBookingStatus(
+        id,
+        "Cancelled"
+      );
+
+      if (!updated) {
+        return res.status(404).json({
+          error: "Booking not found",
+        });
+      }
+
+      res.json({
+        message: "Booking cancelled successfully",
+        booking: updated,
+      });
+    } catch (err) {
+      console.error(
+        "Cancel booking error:",
+        err
+      );
+
+      res.status(500).json({
+        error:
+          err.message ||
+          "Failed to cancel booking",
+      });
+    }
+  }
+);
+
 app.patch(
   "/api/bookings/:id/status",
   requireAuth,
