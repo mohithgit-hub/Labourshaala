@@ -12,7 +12,9 @@ export async function apiFetch(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith("http") ? endpoint : `${API_BASE}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
   const response = await fetch(url, {
     ...options,
@@ -22,7 +24,11 @@ export async function apiFetch(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMsg = data?.error || data?.message || `Request failed with status ${response.status}`;
+    const errorMsg =
+      data?.error ||
+      data?.message ||
+      `Request failed with status ${response.status}`;
+
     const err = new Error(errorMsg);
     err.status = response.status;
     err.data = data;
@@ -57,13 +63,19 @@ export const authAPI = {
 export const workersAPI = {
   getWorkers: ({ skill, search } = {}) => {
     const params = new URLSearchParams();
+
     if (skill) params.append("skill", skill);
     if (search) params.append("search", search);
-    const queryString = params.toString() ? `?${params.toString()}` : "";
+
+    const queryString = params.toString()
+      ? `?${params.toString()}`
+      : "";
+
     return apiFetch(`/workers${queryString}`);
   },
 
-  getWorkerById: (id) => apiFetch(`/workers/${id}`),
+  getWorkerById: (id) =>
+    apiFetch(`/workers/${id}`),
 };
 
 export const bookingsAPI = {
@@ -73,14 +85,21 @@ export const bookingsAPI = {
       body: JSON.stringify({ workerId, skillName }),
     }),
 
-  getCustomerBookings: () => apiFetch("/bookings/customer"),
+  getCustomerBookings: () =>
+    apiFetch("/bookings/customer"),
 
-  getWorkerBookings: () => apiFetch("/bookings/worker"),
+  getWorkerBookings: () =>
+    apiFetch("/bookings/worker"),
 
   updateStatus: (id, status) =>
     apiFetch(`/bookings/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+
+  cancelBooking: (id) =>
+    apiFetch(`/bookings/${id}/cancel`, {
+      method: "POST",
     }),
 
   payBooking: (id, paymentMethod) =>
